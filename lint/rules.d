@@ -6,14 +6,16 @@ import std.array : split, join;
 import std.string : replace;
 
 // Remove private keywords from content (MUST rule)
+@Rule("RemovePrivate", "Removes private keywords as per SPEC.md requirement")
 LintReport removePrivateKeywords(char[] content) {
-    import std.string : replace;
+    import std.string : replace, indexOf;
     import std.array : split, join;
     import std.algorithm : canFind, startsWith;
 
     string original = cast(string)content;
     auto lines = original.split("\n");
     bool foundPrivate = false;
+    Message[] messages;
 
     for(size_t i = 0; i < lines.length; i++) {
         string line = lines[i];
@@ -23,20 +25,24 @@ LintReport removePrivateKeywords(char[] content) {
         if (line.canFind(" private ")) {
             line = line.replace(" private ", " ");
             foundPrivate = true;
+            messages ~= Message("Removed private keyword", i + 1);
         }
         if (line.canFind("private ")) {
             line = line.replace("private ", "");
             foundPrivate = true;
+            messages ~= Message("Removed private keyword", i + 1);
         }
         if (line.canFind(" private")) {
             line = line.replace(" private", "");
             foundPrivate = true;
+            messages ~= Message("Removed private keyword", i + 1);
         }
 
         // Handle cases where private is at beginning of line
         if (line.length >= 8 && line.startsWith("private ")) {
             line = line[8 .. $];
             foundPrivate = true;
+            messages ~= Message("Removed private keyword", i + 1);
         }
 
         // Update the line in the array
@@ -64,12 +70,13 @@ LintReport removePrivateKeywords(char[] content) {
     }
 
     if (foundPrivate) {
-        return LintReport(LintResult.Fixes, ["Removed private keyword"]);
+        return LintReport(LintResult.Fixes, messages);
     }
     return LintReport(LintResult.Success, []);
 }
 
 // Enforce tabs over spaces in indentation (MUST rule)
+@Rule("EnforceTabs", "Enforces tabs over spaces for indentation")
 LintReport enforceTabs(char[] content) {
     import std.string : replace;
     import std.array : split, join;
@@ -78,6 +85,7 @@ LintReport enforceTabs(char[] content) {
     string original = cast(string)content;
     // Replace leading spaces (4 at a time) with tabs
     bool modified = false;
+    Message[] messages;
 
     auto lines = original.split("\n");
 
@@ -90,6 +98,7 @@ LintReport enforceTabs(char[] content) {
                   line.startsWith("    ")) { // Check 4 spaces at start
                 line = "\t" ~ line[4..$];
                 modified = true;
+                messages ~= Message("Converted leading spaces to tabs", i + 1);
             }
             lines[i] = line;
         }
@@ -112,44 +121,55 @@ LintReport enforceTabs(char[] content) {
             content[i] = 0;
         }
 
-        return LintReport(LintResult.Fixes, ["Converted leading spaces to tabs"]);
+        return LintReport(LintResult.Fixes, messages);
     }
 
     return LintReport(LintResult.Success, []);
 }
 
 // Detect immutable/const usage for warnings (SHOULD rule)
+@Rule("DetectImmutableConst", "Detects immutable/const usage for warnings")
 LintReport detectImmutableConst(char[] content) {
     string original = cast(string)content;
     auto lines = original.split("\n");
     bool hasImmutable = false;
     bool hasConst = false;
+    Message[] messages;
 
-    foreach(line; lines) {
+    for(size_t i = 0; i < lines.length; i++) {
+        string line = lines[i];
         if (line.canFind(" immutable ")) {
             hasImmutable = true;
+            messages ~= Message("Found immutable keyword", i + 1);
         }
         if (line.canFind(" const ")) {
             hasConst = true;
+            messages ~= Message("Found const keyword", i + 1);
         }
         // Check also at start of line
         if (line.startsWith("immutable ") || line.startsWith("const ")) {
             hasImmutable = true;
+            if (line.startsWith("const ")) {
+                messages ~= Message("Found const keyword", i + 1);
+            } else {
+                messages ~= Message("Found immutable keyword", i + 1);
+            }
         }
     }
 
     if (hasImmutable && hasConst) {
-        return LintReport(LintResult.Warnings, ["Found immutable and const keywords"]);
+        return LintReport(LintResult.Warnings, messages);
     } else if (hasImmutable) {
-        return LintReport(LintResult.Warnings, ["Found immutable keyword"]);
+        return LintReport(LintResult.Warnings, messages);
     } else if (hasConst) {
-        return LintReport(LintResult.Warnings, ["Found const keyword"]);
+        return LintReport(LintResult.Warnings, messages);
     }
 
     return LintReport(LintResult.Success, []);
 }
 
 // Import normalization functionality
+@Rule("NormalizeImports", "Normalizes import statements")
 LintReport normalizeImports(char[] content) {
     import std.array : split, join;
     import std.algorithm : canFind;
@@ -158,6 +178,7 @@ LintReport normalizeImports(char[] content) {
     string original = cast(string)content;
     auto lines = original.split("\n");
     bool modified = false;
+    Message[] messages;
 
     for(size_t i = 0; i < lines.length; i++) {
         string line = lines[i];
@@ -168,6 +189,7 @@ LintReport normalizeImports(char[] content) {
             import std.regex : regex, matchFirst;
             // For now, a simpler approach - just identify and flag them
             modified = true;
+            messages ~= Message("Found import statement to normalize", i + 1);
         }
         // Look for import statements like "import std.*;"
         else if (line.canFind("import std.*;")) {
@@ -175,6 +197,7 @@ LintReport normalizeImports(char[] content) {
             // This is a simple example - a real implementation would be more complex
             lines[i] = line.replace("import std.*;", "import std.stdio; import std.array; import std.string;");
             modified = true;
+            messages ~= Message("Normalized import statement", i + 1);
         }
     }
 
@@ -192,13 +215,14 @@ LintReport normalizeImports(char[] content) {
             content[i] = 0;
         }
 
-        return LintReport(LintResult.Fixes, ["Normalized import statements"]);
+        return LintReport(LintResult.Fixes, messages);
     }
 
     return LintReport(LintResult.Success, []);
 }
 
 // Section break functionality
+@Rule("AddSectionBreaks", "Adds section breaks to code")
 LintReport addSectionBreaks(char[] content) {
     import std.array : split, join;
     import std.algorithm : canFind;
@@ -206,6 +230,7 @@ LintReport addSectionBreaks(char[] content) {
     string original = cast(string)content;
     auto lines = original.split("\n");
     bool modified = false;
+    Message[] messages;
 
     // Identify different sections in the file
     bool foundTypesSection = false;
@@ -233,6 +258,7 @@ LintReport addSectionBreaks(char[] content) {
                     }
                     lines = newLines;
                     modified = true;
+                    messages ~= Message("Added section break", i + 1);
                 }
                 foundTypesSection = true;
             }
@@ -251,6 +277,7 @@ LintReport addSectionBreaks(char[] content) {
                     }
                     lines = newLines;
                     modified = true;
+                    messages ~= Message("Added section break", i + 1);
                 }
                 foundMainSection = true;
             }
@@ -269,6 +296,7 @@ LintReport addSectionBreaks(char[] content) {
                     }
                     lines = newLines;
                     modified = true;
+                    messages ~= Message("Added section break", i + 1);
                 }
                 foundUnittestSection = true;
             }
@@ -289,13 +317,14 @@ LintReport addSectionBreaks(char[] content) {
             content[i] = 0;
         }
 
-        return LintReport(LintResult.Fixes, ["Added section breaks"]);
+        return LintReport(LintResult.Fixes, messages);
     }
 
     return LintReport(LintResult.Success, []);
 }
 
 // Comment standardization functionality
+@Rule("StandardizeComments", "Standardizes comment formats")
 LintReport standardizeComments(char[] content) {
     import std.array : split, join;
     import std.algorithm : canFind;
@@ -303,15 +332,12 @@ LintReport standardizeComments(char[] content) {
     string original = cast(string)content;
     auto lines = original.split("\n");
     bool hasInvalidComments = false;
+    Message[] messages;
 
-    foreach(line; lines) {
+    for(size_t i = 0; i < lines.length; i++) {
+        string line = lines[i];
         if (line.canFind("//") && !line.canFind("///")) {  // Regular comments, not ddoc
-            string commentPart = "";
-            size_t commentPos = line.canFind("//");
-            if (commentPos != 0) {  // Extract comment part
-                commentPart = line[commentPos .. $];
-            }
-
+            // We know there's a "//" in the line, so we can work with that
             // Check if comment follows the required formats:
             // 1. ddoc format: ///
             // 2. BAD/HACK/RANT format: //BAD: or similar
@@ -322,12 +348,13 @@ LintReport standardizeComments(char[] content) {
 
                 // This is an invalid comment format according to SPEC.md
                 hasInvalidComments = true;
+                messages ~= Message("Found comments that don't follow SPEC.md standards (ddoc, //BAD:, //HACK:, //RANT:, or containing ';' or function calls)", i + 1);
             }
         }
     }
 
     if (hasInvalidComments) {
-        return LintReport(LintResult.Warnings, ["Found comments that don't follow SPEC.md standards (ddoc, //BAD:, //HACK:, //RANT:, or containing ';' or function calls)"]);
+        return LintReport(LintResult.Warnings, messages);
     }
 
     return LintReport(LintResult.Success, []);

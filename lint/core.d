@@ -13,9 +13,24 @@ LintResult max(LintResult a, LintResult b) {
     return cast(LintResult)result;
 }
 
+// UDA to mark rule functions for metaprogramming
+struct Rule {
+    string name;
+    string description;
+    this(string name, string description) {
+        this.name = name;
+        this.description = description;
+    }
+}
+
+struct Message {
+    string content;     // The warning or fix notification message
+    size_t lineNumber;  // Line number where the issue was found
+}
+
 struct LintReport {
     LintResult result;
-    string[] messages;  // Warnings and fix notifications
+    Message[] messages;  // Warnings and fix notifications with line numbers
 }
 
 LintReport combineReports(LintReport a, LintReport b) {

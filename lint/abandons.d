@@ -5,6 +5,7 @@ import std.algorithm : canFind, startsWith;
 import std.array : split, join;
 
 // Detect abandoned constructs (multi-line mixins, quines, etc.) - these get warnings
+@Rule("DetectAbandons", "Detects abandoned constructs like multi-line mixins")
 LintReport detectAbandons(char[] content) {
     string original = cast(string)content;
     auto lines = original.split("\n");
@@ -54,16 +55,46 @@ LintReport detectAbandons(char[] content) {
 
     // Also check for quine-like patterns (self-referencing code)
     bool hasPossibleQuine = original.canFind("typeof(this)") && original.canFind("__traits");
-    hasPossibleQuine = hasPossibleQuine || (original.canFind("stringof") && original.canFind("__FILE__"));
+    size_t quineLine = 0;
+    if (hasPossibleQuine) {
+        for(size_t i = 0; i < lines.length; i++) {
+            if (lines[i].canFind("typeof(this)") && lines[i].canFind("__traits")) {
+                quineLine = i + 1;
+                break;
+            }
+        }
+    }
+
+    bool hasStringofFile = (original.canFind("stringof") && original.canFind("__FILE__"));
+    size_t stringofLine = 0;
+    if (hasStringofFile) {
+        for(size_t i = 0; i < lines.length; i++) {
+            if (lines[i].canFind("stringof") && lines[i].canFind("__FILE__")) {
+                stringofLine = i + 1;
+                break;
+            }
+        }
+    }
+
+    Message[] messages;
 
     if (hasMultiLineMixin && hasEscapedStringMixin) {
-        return LintReport(LintResult.Warnings, ["Found multi-line mixin and escaped string mixin - abandoning analysis", "Found possible self-referencing code pattern"]);
+        messages ~= Message("Found multi-line mixin and escaped string mixin - abandoning analysis", 1); // Would need more sophisticated tracking
     } else if (hasMultiLineMixin) {
-        return LintReport(LintResult.Warnings, ["Found multi-line mixin - abandoning analysis"]);
+        messages ~= Message("Found multi-line mixin - abandoning analysis", 1); // Would need more sophisticated tracking
     } else if (hasEscapedStringMixin) {
-        return LintReport(LintResult.Warnings, ["Found escaped string mixin - abandoning analysis"]);
-    } else if (hasPossibleQuine) {
-        return LintReport(LintResult.Warnings, ["Found possible self-referencing code pattern - abandoning analysis"]);
+        messages ~= Message("Found escaped string mixin - abandoning analysis", 1); // Would need more sophisticated tracking
+    }
+
+    if (hasPossibleQuine && quineLine > 0) {
+        messages ~= Message("Found possible self-referencing code pattern", quineLine);
+    }
+    if (hasStringofFile && stringofLine > 0) {
+        messages ~= Message("Found possible self-referencing code pattern", stringofLine);
+    }
+
+    if (messages.length > 0) {
+        return LintReport(LintResult.Warnings, messages);
     }
 
     return LintReport(LintResult.Success, []);

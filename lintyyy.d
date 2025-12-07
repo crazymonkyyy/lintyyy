@@ -70,7 +70,7 @@ int main(string[] args) {
         // Show results
         writeln("Processing ", arg, ": ", result.result);
         foreach (msg; result.messages) {
-            writeln("  - ", msg);
+            writeln("  - Line ", msg.lineNumber, ": ", msg.content);
         }
 
         // Apply changes only if not in dry-run and not in no-fix mode
