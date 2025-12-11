@@ -26,6 +26,11 @@ struct Rule {
 struct Message {
     string content;     // The warning or fix notification message
     size_t lineNumber;  // Line number where the issue was found
+
+    // Define equality operator for use in collections
+    bool opEquals(const ref Message other) const pure nothrow @safe {
+        return this.content == other.content && this.lineNumber == other.lineNumber;
+    }
 }
 
 struct LintReport {

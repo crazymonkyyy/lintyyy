@@ -114,6 +114,7 @@ LintReport processFile(char[] content, string filename) {
     LintReport finalReport;
 
     // Apply individual rules that make fixes (content will be modified during analysis)
+    finalReport = combineReports(finalReport, enforceShebang(content));
     finalReport = combineReports(finalReport, removePrivateKeywords(content));
     finalReport = combineReports(finalReport, enforceTabs(content));
     finalReport = combineReports(finalReport, normalizeImports(content));

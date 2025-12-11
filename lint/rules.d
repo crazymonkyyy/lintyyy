@@ -323,6 +323,82 @@ LintReport addSectionBreaks(char[] content) {
     return LintReport(LintResult.Success, []);
 }
 
+// Enforce shebang as first line with dmd or opend (MUST rule)
+@Rule("EnforceShebang", "Enforces #! as first line with dmd or opend command")
+LintReport enforceShebang(char[] content) {
+    import std.array : split, join;
+    import std.algorithm : canFind, startsWith;
+    import std.string : replace;
+
+    string original = cast(string)content;
+    auto lines = original.split("\n");
+
+    if (lines.length == 0) {
+        // Empty file, we'll add a shebang
+        auto newLines = ["#!/usr/bin/dmd", ""];
+        string newContent = newLines.join("\n");
+
+        if (newContent.length > content.length) {
+            return LintReport(LintResult.Success, []);
+        }
+
+        for(size_t i = 0; i < newContent.length; i++) {
+            content[i] = newContent[i];
+        }
+        for(size_t i = newContent.length; i < content.length; i++) {
+            content[i] = 0;
+        }
+
+        return LintReport(LintResult.Fixes, [Message("Added shebang to empty file", 1)]);
+    }
+
+    string firstLine = lines[0];
+    Message[] messages;
+    bool needsFix = false;
+
+    // Check if first line starts with #!
+    if (!firstLine.startsWith("#!")) {
+        // First line is not a shebang, prepend it
+        auto newLines = ["#!/usr/bin/dmd"] ~ lines;
+        string newContent = newLines.join("\n");
+
+        if (newContent.length > content.length) {
+            return LintReport(LintResult.Success, []);
+        }
+
+        for(size_t i = 0; i < newContent.length; i++) {
+            content[i] = newContent[i];
+        }
+        for(size_t i = newContent.length; i < content.length; i++) {
+            content[i] = 0;
+        }
+
+        return LintReport(LintResult.Fixes, [Message("Added missing shebang to beginning of file", 1)]);
+    } else {
+        // First line starts with #!, check if it contains dmd or opend
+        if (!firstLine.canFind("dmd") && !firstLine.canFind("opend")) {
+            // Shebang doesn't contain dmd or opend, replace it
+            lines[0] = "#!/usr/bin/dmd";
+            string newContent = lines.join("\n");
+
+            if (newContent.length > content.length) {
+                return LintReport(LintResult.Success, []);
+            }
+
+            for(size_t i = 0; i < newContent.length; i++) {
+                content[i] = newContent[i];
+            }
+            for(size_t i = newContent.length; i < content.length; i++) {
+                content[i] = 0;
+            }
+
+            return LintReport(LintResult.Fixes, [Message("Updated shebang to use dmd command", 1)]);
+        }
+    }
+
+    return LintReport(LintResult.Success, []);
+}
+
 // Comment standardization functionality
 @Rule("StandardizeComments", "Standardizes comment formats")
 LintReport standardizeComments(char[] content) {
@@ -361,6 +437,25 @@ LintReport standardizeComments(char[] content) {
 }
 
 unittest {
+    // Test shebang enforcement
+    char[] testContent0 = "int x = 5;".dup;
+    auto result0 = enforceShebang(testContent0);
+    assert(result0.result == LintResult.Fixes);
+    string strContent0 = cast(string)testContent0;
+    assert(strContent0.startsWith("#!/usr/bin/dmd"));
+
+    // Test shebang with incorrect command
+    char[] testContent0a = "#!/bin/bash\nint x = 5;".dup;
+    auto result0a = enforceShebang(testContent0a);
+    assert(result0a.result == LintResult.Fixes);
+    string strContent0a = cast(string)testContent0a;
+    assert(strContent0a.startsWith("#!/usr/bin/dmd"));
+
+    // Test correct shebang - no modification needed
+    char[] testContent0b = "#!/usr/bin/dmd\nint x = 5;".dup;
+    auto result0b = enforceShebang(testContent0b);
+    assert(result0b.result == LintResult.Success);
+
     // Test private keyword removal
     char[] testContent1 = "private int x;".dup;
     auto result1 = removePrivateKeywords(testContent1);
